@@ -11,6 +11,7 @@ import (
 	neturl "net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/quic-go/webtransport-go"
 	"github.com/ryo-arima/magic-cylinder/internal/entity/model"
@@ -18,14 +19,16 @@ import (
 
 // commonRepository implements the CommonRepository interface
 type commonRepository struct {
-	sequence int        // Current message sequence number
-	mu       sync.Mutex // Mutex for thread-safe sequence operations
+	sequence int           // Current message sequence number
+	mu       sync.Mutex    // Mutex for thread-safe sequence operations
+	delay    time.Duration // Optional artificial delay before echoing
 }
 
 // NewCommonRepository creates a new repository instance
-func NewCommonRepository() CommonRepository {
+func NewCommonRepository(delay time.Duration) CommonRepository {
 	return &commonRepository{
 		sequence: 0,
+		delay:    delay,
 	}
 }
 
@@ -99,6 +102,11 @@ func (r *commonRepository) SendEchoToTarget(targetURL string, message *model.Mes
 	log.Printf("[Repository]   Target URL: %s", targetURL)
 	log.Printf("[Repository]   Message: %s (seq: %d)", message.Content, message.Sequence)
 	log.Printf("[Repository] Creating NEW connection to target server")
+
+	if r.delay > 0 {
+		log.Printf("[Repository] ⏳ Sleeping for %s before echo", r.delay)
+		time.Sleep(r.delay)
+	}
 
 	dialer := &webtransport.Dialer{
 		TLSClientConfig: &tls.Config{
@@ -176,6 +184,18 @@ func (r *commonRepository) SendPlainEchoToTarget(targetURL string, message *mode
 	log.Printf("[Repository] (plain) SendPlainEchoToTarget started")
 	log.Printf("[Repository] (plain)   Target URL: %s", targetURL)
 	log.Printf("[Repository] (plain)   Message: %s (seq: %d)", message.Content, message.Sequence)
+
+	if r.delay > 0 {
+		log.Printf("[Repository] (plain) ⏳ Sleeping for %s before echo", r.delay)
+		time.Sleep(r.delay)
+	}
+
+	// Ensure TLS endpoint for local servers (auto-upgrade http -> https)
+	if u, perr := neturl.Parse(targetURL); perr == nil && u.Scheme == "http" {
+		log.Printf("[Repository] (plain) Upgrading scheme http -> https for target")
+		u.Scheme = "https"
+		targetURL = u.String()
+	}
 
 	data, err := message.ToJSON()
 	if err != nil {

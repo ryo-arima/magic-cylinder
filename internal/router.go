@@ -3,6 +3,7 @@ package internal
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/quic-go/webtransport-go"
 	"github.com/ryo-arima/magic-cylinder/internal/controller"
@@ -71,9 +72,12 @@ func (r *Router) handleHealth(w http.ResponseWriter, req *http.Request) {
 }
 
 // InitializeDependencies creates and returns all required dependencies
-func InitializeDependencies(targetURL string) *Router {
+func InitializeDependencies(targetURL string, delaySeconds int) *Router {
 	log.Printf("[Router] Initializing dependencies with target URL: %s", targetURL)
-	commonRepo := repository.NewCommonRepository()
+	if delaySeconds < 0 {
+		delaySeconds = 0
+	}
+	commonRepo := repository.NewCommonRepository(time.Duration(delaySeconds) * time.Second)
 	commonController := controller.NewCommonController(commonRepo)
 	log.Printf("[Router] Dependencies initialized successfully")
 	return NewRouter(commonController, commonRepo, targetURL)

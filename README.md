@@ -100,7 +100,14 @@ Terminal B (server2 -> server1 via plaintext HTTP):
 ./bin/server -port 8444 -name server2 -target https://localhost:8443/plain
 ```
 
-Then trigger the initial ping via WebTransport as usual (client unchanged), or you can test `/plain` directly:
+You can trigger the initial ping via WebTransport as usual, or use the client in plaintext mode directly:
+
+Client (plaintext):
+```bash
+./bin/client -server https://localhost:8443/plain
+```
+
+Or test `/plain` directly with curl:
 
 ```bash
 curl -k -sS https://localhost:8443/plain \
@@ -131,8 +138,14 @@ Server:
 | -port   | TCP port to listen on                        | 8443    |
 | -name   | Logical server name for log output           | server1 |
 | -target | WebTransport URL of the peer (omit to disable echo) | https://localhost:8444/webtransport |
+| -delay  | Seconds to sleep before each echo (WebTransport or plaintext) | 2 |
 
 For plaintext echo between servers, set `-target` to the `/plain` endpoint, e.g. `https://localhost:8444/plain`.
+You can also introduce a delay:
+```bash
+./bin/server -port 8443 -name server1 -target https://localhost:8444/plain -delay 1
+./bin/server -port 8444 -name server2 -target https://localhost:8443/plain -delay 1
+```
 
 Client:
 ```bash

@@ -1,6 +1,8 @@
 package repository
 
-import "github.com/ryo-arima/magic-cylinder/internal/entity/model"
+import (
+	"github.com/ryo-arima/magic-cylinder/internal/entity/model"
+)
 
 // CommonRepository defines the interface for repository operations
 type CommonRepository interface {
@@ -17,3 +19,5 @@ type CommonRepository interface {
 	// SendPlainEchoToTarget sends a message echo to the target over HTTP (plaintext mode)
 	SendPlainEchoToTarget(targetURL string, message *model.Message) error
 }
+
+// (Constructor implemented in common.go)

@@ -75,6 +75,8 @@ func (c *commonController) HandlePlain(w http.ResponseWriter, r *http.Request, t
 		return
 	}
 
+	log.Printf("[Controller] (plain)[RAW] %s", msg.Content)
+
 	var resp *model.Message
 	if msg.Type == model.PingMessage {
 		log.Printf("[Controller] (plain) Routing to HandlePing...")
@@ -95,6 +97,7 @@ func (c *commonController) HandlePlain(w http.ResponseWriter, r *http.Request, t
 		http.Error(w, "marshal error", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("[Controller] (plain)[RAW] %s", resp.Content)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(data); err != nil {
@@ -173,6 +176,7 @@ func (c *commonController) handleStream(stream *webtransport.Stream, targetURL s
 	log.Printf("[Controller]   Sequence: %d", message.Sequence)
 	log.Printf("[Controller]   From: %s", message.From)
 	log.Printf("[Controller]   To: %s", message.To)
+	log.Printf("[Controller][RAW] %s", message.Content)
 
 	var response *model.Message
 	if message.Type == model.PingMessage {
@@ -205,6 +209,7 @@ func (c *commonController) handleStream(stream *webtransport.Stream, targetURL s
 	log.Printf("[Controller]   Sequence: %d", response.Sequence)
 	log.Printf("[Controller]   From: %s", response.From)
 	log.Printf("[Controller]   To: %s", response.To)
+	log.Printf("[Controller][RAW] %s", response.Content)
 
 	// Echo message to target server if targetURL is provided
 	if targetURL != "" {
