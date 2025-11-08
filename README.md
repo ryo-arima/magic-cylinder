@@ -23,6 +23,7 @@ Servers are identical binaries; behavior is driven by CLI flags (port, name, tar
 - Simple message model: Ping/Pong types with sequence incrementing.
 - Layered architecture (Controller / Repository / Entity) for testability.
 - Single upgrade endpoint: `/webtransport` and basic `/health` endpoint.
+- Optional plaintext echo endpoint: `/plain` (HTTP POST with JSON). Choose by setting the peer target URL to `/plain`.
 
 ## Prerequisites
 - Go 1.21+
@@ -86,6 +87,30 @@ Terminal C:
 ```
 The client exits after sending; watch both server logs for the ongoing chain.
 
+### Plaintext mode (optional)
+If you want the server-to-server echo to use a simple HTTP POST instead of WebTransport, run servers with the `/plain` endpoint as target. The servers still listen with TLS, so use `https://.../plain`.
+
+Terminal A (server1 -> server2 via plaintext HTTP):
+```bash
+./bin/server -port 8443 -name server1 -target https://localhost:8444/plain
+```
+
+Terminal B (server2 -> server1 via plaintext HTTP):
+```bash
+./bin/server -port 8444 -name server2 -target https://localhost:8443/plain
+```
+
+Then trigger the initial ping via WebTransport as usual (client unchanged), or you can test `/plain` directly:
+
+```bash
+curl -k -sS https://localhost:8443/plain \
+	-H 'Content-Type: application/json' \
+	-d '{"type":"ping","content":"Ping via plain","sequence":1,"from":"curl","to":"server"}' | jq .
+```
+Notes:
+- The plaintext echo client accepts both `http://` and `https://` targets. For `https://` with self-signed certs, verification is skipped internally for development.
+- Choosing WebTransport vs plaintext is based solely on the target URL you pass to `-target`.
+
 ## Example Log Snippet
 ```
 [Controller] ✅ WebTransport connection established
@@ -106,6 +131,8 @@ Server:
 | -port   | TCP port to listen on                        | 8443    |
 | -name   | Logical server name for log output           | server1 |
 | -target | WebTransport URL of the peer (omit to disable echo) | https://localhost:8444/webtransport |
+
+For plaintext echo between servers, set `-target` to the `/plain` endpoint, e.g. `https://localhost:8444/plain`.
 
 Client:
 ```bash

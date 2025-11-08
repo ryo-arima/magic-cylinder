@@ -36,6 +36,9 @@ func (r *Router) SetupRoutes(server *webtransport.Server) {
 	log.Printf("[Router] Registering /webtransport endpoint")
 	http.HandleFunc("/webtransport", r.handleWebTransport(server))
 
+	log.Printf("[Router] Registering /plain endpoint (plaintext mode)")
+	http.HandleFunc("/plain", r.handlePlain)
+
 	log.Printf("[Router] Registering /health endpoint")
 	http.HandleFunc("/health", r.handleHealth)
 
@@ -48,6 +51,16 @@ func (r *Router) handleWebTransport(server *webtransport.Server) http.HandlerFun
 		log.Printf("[Router] WebTransport request received from %s", req.RemoteAddr)
 		r.commonController.HandleWebTransport(server, w, req, r.targetURL)
 	}
+}
+
+// handlePlain handles plaintext HTTP POST messages at /plain
+func (r *Router) handlePlain(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	log.Printf("[Router] Plaintext request received from %s", req.RemoteAddr)
+	r.commonController.HandlePlain(w, req, r.targetURL)
 }
 
 // handleHealth handles health check requests

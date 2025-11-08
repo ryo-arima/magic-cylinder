@@ -10,6 +10,8 @@ import (
 // CommonController defines the interface for controller operations
 type CommonController interface {
 	HandleWebTransport(server *webtransport.Server, w http.ResponseWriter, r *http.Request, targetURL string)
+	// HandlePlain handles a plaintext (HTTP POST) message exchange at /plain
+	HandlePlain(w http.ResponseWriter, r *http.Request, targetURL string)
 	HandlePing(message *model.Message) (*model.Message, error)
 	HandlePong(message *model.Message) (*model.Message, error)
 }

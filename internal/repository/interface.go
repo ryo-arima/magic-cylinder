@@ -14,4 +14,6 @@ type CommonRepository interface {
 	IncrementSequence() int
 	// SendEchoToTarget sends a message echo to the target server URL
 	SendEchoToTarget(targetURL string, message *model.Message) error
+	// SendPlainEchoToTarget sends a message echo to the target over HTTP (plaintext mode)
+	SendPlainEchoToTarget(targetURL string, message *model.Message) error
 }

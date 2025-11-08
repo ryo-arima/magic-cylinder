@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/quic-go/webtransport-go"
 	"github.com/ryo-arima/magic-cylinder/internal/entity/model"
@@ -47,6 +48,75 @@ func (c *commonController) HandleWebTransport(server *webtransport.Server, w htt
 	log.Printf("[Controller]   Target URL for echo: %s", targetURL)
 
 	go c.handleConnection(conn, targetURL)
+}
+
+// HandlePlain handles plaintext POST /plain requests by reading a JSON message,
+// generating the next message via repository, replying with JSON, and echoing
+// to the target using plaintext or WebTransport depending on target URL scheme.
+func (c *commonController) HandlePlain(w http.ResponseWriter, r *http.Request, targetURL string) {
+	log.Printf("[Controller] (plain) ============================================")
+	log.Printf("[Controller] (plain) New plaintext request")
+	log.Printf("[Controller] (plain)   Remote Address: %s", r.RemoteAddr)
+	log.Printf("[Controller] (plain)   Method: %s", r.Method)
+	log.Printf("[Controller] (plain)   URL: %s", r.URL.String())
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("[Controller] (plain) ❌ Failed to read body: %v", err)
+		http.Error(w, "failed to read body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	msg, err := model.FromJSON(body)
+	if err != nil {
+		log.Printf("[Controller] (plain) ❌ Failed to parse JSON: %v", err)
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	var resp *model.Message
+	if msg.Type == model.PingMessage {
+		log.Printf("[Controller] (plain) Routing to HandlePing...")
+		resp, err = c.HandlePing(msg)
+	} else {
+		log.Printf("[Controller] (plain) Routing to HandlePong...")
+		resp, err = c.HandlePong(msg)
+	}
+	if err != nil {
+		log.Printf("[Controller] (plain) ❌ Handler failed: %v", err)
+		http.Error(w, "handler error", http.StatusInternalServerError)
+		return
+	}
+
+	data, err := resp.ToJSON()
+	if err != nil {
+		log.Printf("[Controller] (plain) ❌ Failed to marshal response: %v", err)
+		http.Error(w, "marshal error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(data); err != nil {
+		log.Printf("[Controller] (plain) ❌ Failed to write response: %v", err)
+	}
+
+	if targetURL != "" {
+		log.Printf("[Controller] (plain) Triggering echo to target: %s", targetURL)
+		go func() {
+			var echoErr error
+			if strings.HasPrefix(targetURL, "http://") || strings.HasPrefix(targetURL, "https://") {
+				echoErr = c.repo.SendPlainEchoToTarget(targetURL, resp)
+			} else {
+				echoErr = c.repo.SendEchoToTarget(targetURL, resp)
+			}
+			if echoErr != nil {
+				log.Printf("[Controller] (plain) ❌ Echo to target %s failed: %v", targetURL, echoErr)
+			} else {
+				log.Printf("[Controller] (plain) ✅ Echo to target %s completed successfully", targetURL)
+			}
+		}()
+	}
 }
 
 // handleConnection manages the lifecycle of a WebTransport connection
@@ -141,8 +211,14 @@ func (c *commonController) handleStream(stream *webtransport.Stream, targetURL s
 		log.Printf("[Controller] Triggering echo to target: %s", targetURL)
 		log.Printf("[Controller] Note: Echo will create a NEW connection to target")
 		go func() {
-			if err := c.repo.SendEchoToTarget(targetURL, response); err != nil {
-				log.Printf("[Controller] ❌ Echo to target %s failed: %v", targetURL, err)
+			var echoErr error
+			if strings.HasPrefix(targetURL, "http://") || strings.HasPrefix(targetURL, "https://") {
+				echoErr = c.repo.SendPlainEchoToTarget(targetURL, response)
+			} else {
+				echoErr = c.repo.SendEchoToTarget(targetURL, response)
+			}
+			if echoErr != nil {
+				log.Printf("[Controller] ❌ Echo to target %s failed: %v", targetURL, echoErr)
 			} else {
 				log.Printf("[Controller] ✅ Echo to target %s completed successfully", targetURL)
 			}

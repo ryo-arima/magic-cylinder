@@ -1,10 +1,15 @@
 package repository
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	neturl "net/url"
+	"strings"
 	"sync"
 
 	"github.com/quic-go/webtransport-go"
@@ -161,5 +166,44 @@ func (r *commonRepository) SendEchoToTarget(targetURL string, message *model.Mes
 	// The response is already logged, no need to process it further in this connection
 	log.Printf("[Repository] ==========================================")
 
+	return nil
+}
+
+// SendPlainEchoToTarget sends the message via a simple HTTP POST (plaintext mode)
+// Expected targetURL form: http://host:port/plain (the server must expose a handler)
+func (r *commonRepository) SendPlainEchoToTarget(targetURL string, message *model.Message) error {
+	log.Printf("[Repository] (plain) ==========================================")
+	log.Printf("[Repository] (plain) SendPlainEchoToTarget started")
+	log.Printf("[Repository] (plain)   Target URL: %s", targetURL)
+	log.Printf("[Repository] (plain)   Message: %s (seq: %d)", message.Content, message.Sequence)
+
+	data, err := message.ToJSON()
+	if err != nil {
+		return fmt.Errorf("marshal message: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, targetURL, bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Allow both http and https (self-signed) for plaintext path
+	client := http.DefaultClient
+	if u, perr := neturl.Parse(targetURL); perr == nil && u.Scheme == "https" {
+		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("plain echo request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	log.Printf("[Repository] (plain) Response status: %s", resp.Status)
+	trimmed := strings.TrimSpace(string(body))
+	if trimmed != "" {
+		log.Printf("[Repository] (plain) Body: %s", trimmed)
+	}
+	log.Printf("[Repository] (plain) ==========================================")
 	return nil
 }
